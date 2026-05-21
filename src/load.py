@@ -23,6 +23,8 @@ parser.add_argument('-o', '--organization', type=str, help='Optional organizatio
 parser.add_argument('--tn_rest_api', dest='tn_rest_api_domain', type=str, help='Optional domain to authenticate with the REST API', default=None, required=False)
 parser.add_argument('--trigger_api', dest='trigger_api_domain', type=str, help='Optional domain to authenticate with the Trigger API', default=None, required=False)
 parser.add_argument('-d', '--loader_destination', type=str, help='Optional destination to archive the numberspaces to', default="../archived_numberspaces", required=False)
+parser.add_argument('--delete_existing_data', dest='delete_existing_data', action="store_true", help='Controls whether to delete existing data before loading', default=False, required=False)
+parser.add_argument('--load_from', type=str, help='Optional source of the data to load', choices=["Statements", "Truenumbers"], default=None, required=False)
 
 api_token_arg = parser.parse_args().api_token;
 numberspaces_arg = parser.parse_args().numberspaces;
@@ -36,7 +38,8 @@ organization_arg = parser.parse_args().organization;
 tn_rest_api_domain_arg = parser.parse_args().tn_rest_api_domain;
 trigger_api_domain_arg = parser.parse_args().trigger_api_domain;
 loader_destination_arg = parser.parse_args().loader_destination;
-
+delete_existing_data_arg = parser.parse_args().delete_existing_data;
+load_from_arg = parser.parse_args().load_from;
 
 def get_numberspaces_to_load():
     os.listdir(loader_destination_arg)
@@ -64,17 +67,23 @@ def get_numberspaces_to_load():
         return [numberspace for numberspace in numberspace_archives if numberspace in numberspaces_to_load]
 
 
-def load_numberspace(tn_rest_api_client: TruenumbersRestApi, trigger_api_client: TruenumbersTriggerApi, numberspace_label: str, should_load_queries: bool, should_load_triggers: bool):
-    print(f"Loading numberspace: {numberspace_label}")
+def load_numberspace(tn_rest_api_client: TruenumbersRestApi, trigger_api_client: TruenumbersTriggerApi, numberspace: str, should_load_queries: bool, should_load_triggers: bool, delete_existing_data: bool, load_from: str):
+    print(f"Loading numberspace: {numberspace}")
+    from_statements = load_from == "Statements"
+    from_truenumbers = load_from == "Truenumbers"
     statements = ''
     truenumbers = []
-    with open(os.path.join(loader_destination_arg, numberspace_label, "statements.txt"), "r") as f:
+    if delete_existing_data:
+        tn_rest_api_client.delete_truenumbers(numberspace=numberspace, tnql="* has *")
+    with open(os.path.join(loader_destination_arg, numberspace, "statements.txt"), "r") as f:
         statements = f.read()
-    with open(os.path.join(loader_destination_arg, numberspace_label, "truenumbers.json"), "r") as f:
+    with open(os.path.join(loader_destination_arg, numberspace, "truenumbers.json"), "r") as f:
         truenumbers = json.load(f)
 
-    print(statements)
-    print(truenumbers)
+    if from_statements:
+        tn_rest_api_client.create_truenumbers_from_statement(numberspace=numberspace, true_statement=statements)
+    if from_truenumbers:
+        tn_rest_api_client.create_truenumbers_from_json(numberspace=numberspace, truenumbers_json=truenumbers)
     
 def main():
     should_load_triggers = load_triggers_arg or inquirer.confirm(message="Do you want to load triggers?", default=True).execute()
@@ -93,9 +102,11 @@ def main():
     tn_rest_api_client = TruenumbersRestApi(base_url=tn_rest_api_domain, shared_headers={"Authorization": f"Bearer {api_token}"} if api_token is not None else None)
     trigger_api_client = TruenumbersTriggerApi(base_url=trigger_api_domain, shared_headers={"Authorization": f"Bearer {api_token}"} if api_token is not None else None)
 
+    delete_existing_data = delete_existing_data_arg or inquirer.confirm(message="Do you want to delete existing data before loading?", default=False).execute()
     numberspaces_to_load = get_numberspaces_to_load()
+    load_from = load_from_arg or inquirer.select(message="Select the source of the data to load", choices=["Statements", "Truenumbers"], default="Truenumbers").execute()
     print(f"Numberspaces to load: {numberspaces_to_load}")
-    for numberspace_label in numberspaces_to_load:
-        load_numberspace(tn_rest_api_client, trigger_api_client, numberspace_label, should_load_queries, should_load_triggers)
+    for numberspace in numberspaces_to_load:
+        load_numberspace(tn_rest_api_client, trigger_api_client, numberspace, should_load_queries, should_load_triggers, delete_existing_data, load_from)
 
 main()

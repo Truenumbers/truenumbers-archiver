@@ -70,8 +70,6 @@ def get_api_token(tn_rest_api_domain, arguments_dict):
         api_token = inquirer.text(message="Enter your API token").execute()
         return api_token
 
-
-
 NUMBERSPACE_PRODUCT_CODE_REGEXP = re.compile(
     r"^_system:numberspace:product_code:.*/",
     re.IGNORECASE,
