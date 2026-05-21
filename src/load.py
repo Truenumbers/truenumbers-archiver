@@ -75,6 +75,9 @@ def load_numberspace(tn_rest_api_client: TruenumbersRestApi, trigger_api_client:
     truenumbers = []
     if delete_existing_data:
         tn_rest_api_client.delete_truenumbers(numberspace=numberspace, tnql="* has *")
+        # Delete queries
+        # Delete triggers
+        
     with open(os.path.join(loader_destination_arg, numberspace, "statements.txt"), "r") as f:
         statements = f.read()
     with open(os.path.join(loader_destination_arg, numberspace, "truenumbers.json"), "r") as f:
@@ -84,7 +87,22 @@ def load_numberspace(tn_rest_api_client: TruenumbersRestApi, trigger_api_client:
         tn_rest_api_client.create_truenumbers_from_statement(numberspace=numberspace, true_statement=statements)
     if from_truenumbers:
         tn_rest_api_client.create_truenumbers_from_json(numberspace=numberspace, truenumbers_json=truenumbers)
-    
+
+    if should_load_queries:
+        queries = []
+        with open(os.path.join(loader_destination_arg, numberspace, "queries.json"), "r") as f:
+            queries = json.load(f)
+        for query in queries:
+            tn_rest_api_client.create_saved_query(numberspace=numberspace, name=query["name"], tnql=query["tnql"])
+    if should_load_triggers:
+        triggers = []
+        with open(os.path.join(loader_destination_arg, numberspace, "triggers.json"), "r") as f:
+            triggers = json.load(f)
+        for trigger in triggers:
+            trigger_api_client.create_trigger(numberspace=numberspace, name=trigger["name"], tnql=trigger["tnql"],
+            execute_on=trigger["execute_on"], description=trigger["description"], status=trigger["status"],
+            tag_on_trigger=trigger["tag_on_trigger"], load_historic_data=trigger["load_historic_data"], destinations=trigger["destinations"])
+
 def main():
     should_load_triggers = load_triggers_arg or inquirer.confirm(message="Do you want to load triggers?", default=True).execute()
     should_load_queries = load_queries_arg or inquirer.confirm(message="Do you want to load queries?", default=True).execute()
