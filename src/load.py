@@ -42,7 +42,6 @@ delete_existing_data_arg = parser.parse_args().delete_existing_data;
 load_from_arg = parser.parse_args().load_from;
 
 def get_numberspaces_to_load():
-    os.listdir(loader_destination_arg)
     numberspace_archives = []
     for directory in os.listdir(loader_destination_arg):
         if not os.path.isdir(os.path.join(loader_destination_arg, directory)):
@@ -77,7 +76,7 @@ def load_numberspace(tn_rest_api_client: TruenumbersRestApi, trigger_api_client:
         tn_rest_api_client.delete_truenumbers(numberspace=numberspace, tnql="* has *")
         # Delete queries
         # Delete triggers
-        
+
     with open(os.path.join(loader_destination_arg, numberspace, "statements.txt"), "r") as f:
         statements = f.read()
     with open(os.path.join(loader_destination_arg, numberspace, "truenumbers.json"), "r") as f:
