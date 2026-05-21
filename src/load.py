@@ -74,8 +74,8 @@ def load_numberspace(tn_rest_api_client: TruenumbersRestApi, trigger_api_client:
     truenumbers = []
     if delete_existing_data:
         tn_rest_api_client.delete_truenumbers(numberspace=numberspace, tnql="* has *")
-        # Delete queries
-        # Delete triggers
+        # TODO: Delete queries
+        # TODO: Delete triggers
 
     with open(os.path.join(loader_destination_arg, numberspace, "statements.txt"), "r") as f:
         statements = f.read()
@@ -85,6 +85,7 @@ def load_numberspace(tn_rest_api_client: TruenumbersRestApi, trigger_api_client:
     if from_statements:
         tn_rest_api_client.create_truenumbers_from_statement(numberspace=numberspace, true_statement=statements)
     if from_truenumbers:
+        ## TODO: chunk the truenumbers into smaller batches and create them in chunks
         tn_rest_api_client.create_truenumbers_from_json(numberspace=numberspace, truenumbers_json=truenumbers)
 
     if should_load_queries:
