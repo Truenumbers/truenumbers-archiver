@@ -67,7 +67,7 @@ def get_truenumbers(tn_rest_api_client: TruenumbersRestApi, numberspace: str) ->
     truenumbers.extend(initial_response["truenumbers"])
     total_count = initial_response["count"]
     while len(truenumbers) < total_count:
-        offset += limit
+        offset = offset + 1
         response = tn_rest_api_client.tnql(tnql="* has *", numberspace=numberspace, limit=limit, offset=offset)
         truenumbers.extend(response["truenumbers"])
     return truenumbers
