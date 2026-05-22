@@ -5,7 +5,7 @@ import os
 import json
 from InquirerPy import inquirer
 from InquirerPy.separator import Separator
-from helpers import format_numberspace_srd_label, get_api_domains, get_api_error_code, get_api_token
+from helpers import format_numberspace_srd_label, get_api_domains, get_api_error_code, get_api_token, get_dir_name_for_numberspace
 from truenumbers_python_lib import TruenumbersRestApi, TruenumbersTriggerApi
 
 API_TOKEN_ENV_VAR = 'API_TOKEN'
@@ -69,9 +69,10 @@ def get_numberspaces_to_load():
 
 def load_triggers(trigger_api_client: TruenumbersTriggerApi, numberspace: str, delete_existing_data: bool):
     numberspace_label = format_numberspace_srd_label(numberspace)
+    numberspace_dir_name = get_dir_name_for_numberspace(numberspace_label)
     triggers = []
     try:
-        with open(os.path.join(loader_destination_arg, numberspace_label, "triggers.json"), "r") as f:
+        with open(os.path.join(loader_destination_arg, numberspace_dir_name, "triggers.json"), "r") as f:
             triggers = json.load(f)
         if len(triggers) > 0:
             if delete_existing_data:
@@ -89,9 +90,10 @@ def load_triggers(trigger_api_client: TruenumbersTriggerApi, numberspace: str, d
 
 def load_queries(tn_rest_api_client: TruenumbersRestApi, numberspace: str, delete_existing_data: bool):
     numberspace_label = format_numberspace_srd_label(numberspace)
+    numberspace_dir_name = get_dir_name_for_numberspace(numberspace_label)
     queries = []
     try:
-        with open(os.path.join(loader_destination_arg, numberspace_label, "queries.json"), "r") as f:
+        with open(os.path.join(loader_destination_arg, numberspace_dir_name, "queries.json"), "r") as f:
             queries = json.load(f)
         if len(queries) > 0:
             if delete_existing_data:
@@ -108,6 +110,7 @@ def load_queries(tn_rest_api_client: TruenumbersRestApi, numberspace: str, delet
 
 def load_numberspace(tn_rest_api_client: TruenumbersRestApi, trigger_api_client: TruenumbersTriggerApi, numberspace: str, should_load_queries: bool, should_load_triggers: bool, delete_existing_data: bool, load_from: str):
     numberspace_label = format_numberspace_srd_label(numberspace)
+    numberspace_dir_name = get_dir_name_for_numberspace(numberspace_label)
     print("\n\n")
     print(f"Loading numberspace: {numberspace_label}")
     from_statements = load_from == "Statements"
@@ -123,9 +126,9 @@ def load_numberspace(tn_rest_api_client: TruenumbersRestApi, trigger_api_client:
             print(f"Error creating numberspace: {numberspace_label}")
             print(e)
             return
-    with open(os.path.join(loader_destination_arg, numberspace_label, "statements.txt"), "r") as f:
+    with open(os.path.join(loader_destination_arg, numberspace_dir_name, "statements.txt"), "r") as f:
         statements = f.read()
-    with open(os.path.join(loader_destination_arg, numberspace_label, "truenumbers.json"), "r") as f:
+    with open(os.path.join(loader_destination_arg, numberspace_dir_name, "truenumbers.json"), "r") as f:
         truenumbers = json.load(f)
 
     try:

@@ -101,3 +101,5 @@ def format_numberspace_srd_label(srd: str) -> str:
         return NUMBERSPACE_PRODUCT_CODE_REGEXP.sub("", srd)
     return srd.replace("_system:numberspace/", "").strip()
 
+def get_dir_name_for_numberspace(numberspace: str) -> str:
+    return format_numberspace_srd_label(numberspace).replace("/", "_").replace(":", "_")

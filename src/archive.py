@@ -5,7 +5,7 @@ from InquirerPy import inquirer
 from InquirerPy.separator import Separator
 import os
 import argparse
-from helpers import get_api_token, get_api_domains, format_numberspace_srd_label
+from helpers import get_api_token, get_api_domains, format_numberspace_srd_label, get_dir_name_for_numberspace
 from truenumbers_python_lib import TruenumbersRestApi, TruenumbersTriggerApi
 API_TOKEN_ENV_VAR = 'API_TOKEN'
 
@@ -75,28 +75,29 @@ def get_truenumbers(tn_rest_api_client: TruenumbersRestApi, numberspace: str) ->
 def archive_numberspace(tn_rest_api_client: TruenumbersRestApi, trigger_api_client: TruenumbersTriggerApi, numberspace_label: str, full_numberspace_name: str, should_archive_queries: bool, should_archive_triggers: bool):
     print("\n\n")
     print(f"Archiving numberspace: {numberspace_label}")
-    os.makedirs(os.path.join(archiver_destination_arg, numberspace_label), exist_ok=True)
-    with open(os.path.join(archiver_destination_arg, numberspace_label, "numberspace.txt"), "w") as f:
+    numberspace_dir_name = get_dir_name_for_numberspace(numberspace_label)  
+    os.makedirs(os.path.join(archiver_destination_arg, numberspace_dir_name), exist_ok=True)
+    with open(os.path.join(archiver_destination_arg, numberspace_dir_name, "numberspace.txt"), "w") as f:
         f.write(full_numberspace_name)
     print(f"Archiving truenumbers for numberspace: {numberspace_label}")
     truenumbers = get_truenumbers(tn_rest_api_client, full_numberspace_name)
-    with open(os.path.join(archiver_destination_arg, numberspace_label, "truenumbers.json"), "w") as f:
+    with open(os.path.join(archiver_destination_arg, numberspace_dir_name, "truenumbers.json"), "w") as f:
         json.dump(truenumbers, f, indent=4)
     statements = [truenumber["trueStatement"] for truenumber in truenumbers]
     print(f"Archived {len(truenumbers)} truenumbers for numberspace: {numberspace_label}")
-    with open(os.path.join(archiver_destination_arg, numberspace_label, "statements.txt"), "w") as f:
+    with open(os.path.join(archiver_destination_arg, numberspace_dir_name, "statements.txt"), "w") as f:
         f.write("\n".join(statements))
     if should_archive_queries:
         print(f"Archiving queries for numberspace: {numberspace_label}")
         queries = tn_rest_api_client.get_saved_queries(numberspace=full_numberspace_name)["queries"]
         print(f"Archived {len(queries)} queries for numberspace: {numberspace_label}")
-        with open(os.path.join(archiver_destination_arg, numberspace_label, "queries.json"), "w") as f:
+        with open(os.path.join(archiver_destination_arg, numberspace_dir_name, "queries.json"), "w") as f:
             json.dump(queries, f, indent=4)
     if should_archive_triggers:
         print(f"Archiving triggers for numberspace: {numberspace_label}")
         triggers = trigger_api_client.get_triggers(numberspace=full_numberspace_name, status=["ACTIVE", "INACTIVE"])["triggerDefinitions"]
         print(f"Archived {len(triggers)} triggers for numberspace: {numberspace_label}")
-        with open(os.path.join(archiver_destination_arg, numberspace_label, "triggers.json"), "w") as f:
+        with open(os.path.join(archiver_destination_arg, numberspace_dir_name, "triggers.json"), "w") as f:
             json.dump(triggers, f, indent=4)
     
 
