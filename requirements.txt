@@ -1,2 +1,3 @@
 InquirerPy
 requests
+truenumbers-python-lib @ git+https://github.com/Truenumbers/truenumbers-python-lib@0.0.3

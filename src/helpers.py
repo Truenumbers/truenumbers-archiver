@@ -1,5 +1,5 @@
 from InquirerPy import inquirer
-from truenumbers_python_lib.TruenumbersRestApi import TruenumbersRestApi
+from truenumbers_python_lib import TruenumbersRestApi
 import re
 
 

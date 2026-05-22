@@ -1,12 +1,12 @@
 #! /usr/bin/env python3
+import _venv_bootstrap  # noqa: F401, E402 — must run before other imports
 import json
 from InquirerPy import inquirer
 from InquirerPy.separator import Separator
 import os
 import argparse
 from helpers import get_api_token, get_api_domains, format_numberspace_srd_label
-from truenumbers_python_lib.TruenumbersRestApi import TruenumbersRestApi
-from truenumbers_python_lib.TruenumbersTriggerApi import TruenumbersTriggerApi
+from truenumbers_python_lib import TruenumbersRestApi, TruenumbersTriggerApi
 API_TOKEN_ENV_VAR = 'API_TOKEN'
 
 parser = argparse.ArgumentParser()
