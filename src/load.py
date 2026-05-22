@@ -5,7 +5,7 @@ import os
 import json
 from InquirerPy import inquirer
 from InquirerPy.separator import Separator
-from helpers import get_api_domains, get_api_token
+from helpers import format_numberspace_srd_label, get_api_domains, get_api_error_code, get_api_token
 from truenumbers_python_lib import TruenumbersRestApi, TruenumbersTriggerApi
 
 API_TOKEN_ENV_VAR = 'API_TOKEN'
@@ -55,53 +55,103 @@ def get_numberspaces_to_load():
         return numberspace_archives
     if numberspaces_arg and numberspaces_arg != "":
         numberspaces_arg_list = numberspaces_arg.split(",")
-        numberspaces_to_load = [numberspace for numberspace in numberspace_archives if numberspace in numberspaces_arg_list]
+        numberspaces_to_load = [numberspace for numberspace in numberspace_archives if format_numberspace_srd_label(numberspace) in numberspaces_arg_list]
         return numberspaces_to_load
   
-    choices = ["All", Separator(), *numberspace_archives]
+    formatted_numberspace_archives = [format_numberspace_srd_label(numberspace) for numberspace in numberspace_archives]
+    choices = ["All", Separator(), *formatted_numberspace_archives]
     numberspaces_to_load = inquirer.checkbox(message="Select the numberspaces to load", choices=choices, default=["All"]).execute()
     if "All" in numberspaces_to_load:
         return numberspace_archives
     else:
-        return [numberspace for numberspace in numberspace_archives if numberspace in numberspaces_to_load]
+        return [numberspace for numberspace in numberspace_archives if format_numberspace_srd_label(numberspace) in numberspaces_to_load]
+
+
+def load_triggers(trigger_api_client: TruenumbersTriggerApi, numberspace: str, delete_existing_data: bool):
+    numberspace_label = format_numberspace_srd_label(numberspace)
+    triggers = []
+    try:
+        with open(os.path.join(loader_destination_arg, numberspace_label, "triggers.json"), "r") as f:
+            triggers = json.load(f)
+        if len(triggers) > 0:
+            if delete_existing_data:
+                print(f"Deleting existing triggers for numberspace: {numberspace_label}")
+                trigger_api_client.delete_triggers(numberspace=numberspace)
+            for trigger in triggers:
+                print(f"Loading trigger: {trigger['name']} for numberspace: {numberspace_label}")
+                trigger_api_client.create_trigger(numberspace=numberspace, name=trigger["name"], tnql=trigger["tnql"],
+                execute_on=trigger["executeOn"], description=trigger["description"], status=trigger["status"],
+                tag_on_trigger=trigger["tagOnTrigger"], destinations=trigger["destinations"])
+    except Exception as e:
+        print(f"Error loading triggers for numberspace: {numberspace_label}")
+        print(e)
+        return
+
+def load_queries(tn_rest_api_client: TruenumbersRestApi, numberspace: str, delete_existing_data: bool):
+    numberspace_label = format_numberspace_srd_label(numberspace)
+    queries = []
+    try:
+        with open(os.path.join(loader_destination_arg, numberspace_label, "queries.json"), "r") as f:
+            queries = json.load(f)
+        if len(queries) > 0:
+            if delete_existing_data:
+                print(f"Deleting existing queries for numberspace: {numberspace_label}")
+                tn_rest_api_client.delete_saved_queries(numberspace=numberspace)
+            for query in queries:
+                print(f"Loading query: {query['name']} for numberspace: {numberspace_label}")
+                tn_rest_api_client.create_saved_query(numberspace=numberspace, name=query["name"], tnql=query["tnql"])
+    except Exception as e:
+        print(f"Error loading queries for numberspace: {numberspace_label}")
+        print(e)
+        return
 
 
 def load_numberspace(tn_rest_api_client: TruenumbersRestApi, trigger_api_client: TruenumbersTriggerApi, numberspace: str, should_load_queries: bool, should_load_triggers: bool, delete_existing_data: bool, load_from: str):
-    print(f"Loading numberspace: {numberspace}")
+    numberspace_label = format_numberspace_srd_label(numberspace)
+    print("\n\n")
+    print(f"Loading numberspace: {numberspace_label}")
     from_statements = load_from == "Statements"
     from_truenumbers = load_from == "Truenumbers"
     statements = ''
     truenumbers = []
-    if delete_existing_data:
-        tn_rest_api_client.delete_truenumbers(numberspace=numberspace, tnql="* has *")
-        # TODO: Delete queries
-        # TODO: Delete triggers
-
-    with open(os.path.join(loader_destination_arg, numberspace, "statements.txt"), "r") as f:
+    try:
+        tn_rest_api_client.create_numberspace(numberspace=numberspace)
+    except Exception as e:
+        if get_api_error_code(e) == "NUMBERSPACE_ALREADY_EXISTS":
+            print(f"Numberspace already exists: {numberspace_label}. Skipping create numberspace.")
+        else:
+            print(f"Error creating numberspace: {numberspace_label}")
+            print(e)
+            return
+    with open(os.path.join(loader_destination_arg, numberspace_label, "statements.txt"), "r") as f:
         statements = f.read()
-    with open(os.path.join(loader_destination_arg, numberspace, "truenumbers.json"), "r") as f:
+    with open(os.path.join(loader_destination_arg, numberspace_label, "truenumbers.json"), "r") as f:
         truenumbers = json.load(f)
 
-    if from_statements:
-        tn_rest_api_client.create_truenumbers_from_statement(numberspace=numberspace, true_statement=statements)
-    if from_truenumbers:
-        ## TODO: chunk the truenumbers into smaller batches and create them in chunks
-        tn_rest_api_client.create_truenumbers_from_json(numberspace=numberspace, truenumbers_json=truenumbers)
+    try:
+        if delete_existing_data:
+            print(f"Deleting existing data for numberspace: {numberspace_label}")
+            tn_rest_api_client.delete_truenumbers(numberspace=numberspace, tnql="* has *")
+        has_statements = from_statements and statements and len(statements) > 0;
+        has_truenumbers = from_truenumbers and truenumbers and len(truenumbers) > 0;
+        if not has_statements and not has_truenumbers:
+            print(f"No truenumber data to load for numberspace: {numberspace_label}")
+        if from_statements and has_statements:
+            print(f"Loading statements for numberspace: {numberspace_label}")
+            tn_rest_api_client.create_truenumbers_from_statement(numberspace=numberspace, true_statement=statements)
+        if from_truenumbers and has_truenumbers:
+            ## TODO: chunk the truenumbers into smaller batches and create them in chunks
+            print(f"Loading truenumbers for numberspace: {numberspace_label}")
+            tn_rest_api_client.create_truenumbers_from_json(numberspace=numberspace, truenumbers_json=truenumbers)
+    except Exception as e:
+        print(f"Error loading numberspace: {numberspace_label}")
+        print(e)
+        return
 
     if should_load_queries:
-        queries = []
-        with open(os.path.join(loader_destination_arg, numberspace, "queries.json"), "r") as f:
-            queries = json.load(f)
-        for query in queries:
-            tn_rest_api_client.create_saved_query(numberspace=numberspace, name=query["name"], tnql=query["tnql"])
+        load_queries(tn_rest_api_client, numberspace, delete_existing_data)
     if should_load_triggers:
-        triggers = []
-        with open(os.path.join(loader_destination_arg, numberspace, "triggers.json"), "r") as f:
-            triggers = json.load(f)
-        for trigger in triggers:
-            trigger_api_client.create_trigger(numberspace=numberspace, name=trigger["name"], tnql=trigger["tnql"],
-            execute_on=trigger["execute_on"], description=trigger["description"], status=trigger["status"],
-            tag_on_trigger=trigger["tag_on_trigger"], load_historic_data=trigger["load_historic_data"], destinations=trigger["destinations"])
+        load_triggers(trigger_api_client, numberspace, delete_existing_data)
 
 def main():
     should_load_triggers = load_triggers_arg or inquirer.confirm(message="Do you want to load triggers?", default=True).execute()
@@ -122,8 +172,8 @@ def main():
 
     delete_existing_data = delete_existing_data_arg or inquirer.confirm(message="Do you want to delete existing data before loading?", default=False).execute()
     numberspaces_to_load = get_numberspaces_to_load()
+    print(f"Numberspaces to load: {[format_numberspace_srd_label(numberspace) for numberspace in numberspaces_to_load]}")
     load_from = load_from_arg or inquirer.select(message="Select the source of the data to load", choices=["Statements", "Truenumbers"], default="Truenumbers").execute()
-    print(f"Numberspaces to load: {numberspaces_to_load}")
     for numberspace in numberspaces_to_load:
         load_numberspace(tn_rest_api_client, trigger_api_client, numberspace, should_load_queries, should_load_triggers, delete_existing_data, load_from)
 

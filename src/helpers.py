@@ -1,5 +1,6 @@
 from InquirerPy import inquirer
 from truenumbers_python_lib import TruenumbersRestApi
+import json
 import re
 
 
@@ -74,6 +75,26 @@ NUMBERSPACE_PRODUCT_CODE_REGEXP = re.compile(
     r"^_system:numberspace:product_code:.*/",
     re.IGNORECASE,
 )
+
+def get_api_error_body(exc: BaseException) -> dict | None:
+    message = str(exc)
+    json_start = message.find("{")
+    if json_start == -1:
+        return None
+    try:
+        body = json.loads(message[json_start:])
+    except json.JSONDecodeError:
+        return None
+    return body if isinstance(body, dict) else None
+
+
+def get_api_error_code(exc: BaseException) -> str | None:
+    body = get_api_error_body(exc)
+    if body is None:
+        return None
+    code = body.get("code")
+    return code if isinstance(code, str) else None
+
 
 def format_numberspace_srd_label(srd: str) -> str:
     if NUMBERSPACE_PRODUCT_CODE_REGEXP.search(srd):

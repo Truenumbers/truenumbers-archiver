@@ -40,51 +40,62 @@ archiver_destination_arg = parser.parse_args().archiver_destination;
 def get_numberspaces_to_archive(tn_rest_api_client):
     numberspaces = tn_rest_api_client.get_numberspaces()["numberspaces"]
     numberspace_labels = [format_numberspace_srd_label(numberspace) for numberspace in numberspaces]
+
+    def return_numberspaces(numberspace_labels_to_return: list[str]):
+        formatted_numberspace_labels_to_return = [format_numberspace_srd_label(numberspace) for numberspace in numberspace_labels_to_return]
+        numberspaces_to_return = [numberspace for numberspace in numberspaces if format_numberspace_srd_label(numberspace) in formatted_numberspace_labels_to_return]
+        return formatted_numberspace_labels_to_return, numberspaces_to_return
+
     if archive_all_numberspaces_arg:
-        return numberspace_labels
+        return return_numberspaces(numberspace_labels)
     if numberspaces_arg and numberspaces_arg != "":
         numberspaces_arg_list = numberspaces_arg.split(",")
-        numberspaces_to_archive = [numberspace for numberspace in numberspace_labels if numberspace in numberspaces_arg_list]
-        return numberspaces_to_archive
+        return return_numberspaces([numberspace for numberspace in numberspace_labels if numberspace in numberspaces_arg_list])
     else:
         choices = ["All", Separator(), *numberspace_labels]
         numberspaces_to_archive = inquirer.checkbox(message="Select the numberspaces to archive", choices=choices, default=["All"]).execute()
         if "All" in numberspaces_to_archive:
-            return numberspace_labels
+            return return_numberspaces(numberspace_labels)
         else:
-            return [numberspace for numberspace in numberspace_labels if numberspace in numberspaces_to_archive]
+            return return_numberspaces([numberspace for numberspace in numberspace_labels if numberspace in numberspaces_to_archive])
 
-def get_truenumbers(tn_rest_api_client: TruenumbersRestApi, numberspace_label: str) -> list[dict]:
+def get_truenumbers(tn_rest_api_client: TruenumbersRestApi, numberspace: str) -> list[dict]:
     limit = 1000
     offset = 0
     truenumbers = []
-    initial_response = tn_rest_api_client.tnql(tnql="* has *", numberspace=numberspace_label, limit=limit, offset=offset)
+    initial_response = tn_rest_api_client.tnql(tnql="* has *", numberspace=numberspace, limit=limit, offset=offset)
     truenumbers.extend(initial_response["truenumbers"])
     total_count = initial_response["count"]
     while len(truenumbers) < total_count:
         offset += limit
-        response = tn_rest_api_client.tnql(tnql="* has *", numberspace=numberspace_label, limit=limit, offset=offset)
+        response = tn_rest_api_client.tnql(tnql="* has *", numberspace=numberspace, limit=limit, offset=offset)
         truenumbers.extend(response["truenumbers"])
     return truenumbers
 
-def archive_numberspace(tn_rest_api_client: TruenumbersRestApi, trigger_api_client: TruenumbersTriggerApi, numberspace_label: str, should_archive_queries: bool, should_archive_triggers: bool):
+def archive_numberspace(tn_rest_api_client: TruenumbersRestApi, trigger_api_client: TruenumbersTriggerApi, numberspace_label: str, full_numberspace_name: str, should_archive_queries: bool, should_archive_triggers: bool):
+    print("\n\n")
     print(f"Archiving numberspace: {numberspace_label}")
     os.makedirs(os.path.join(archiver_destination_arg, numberspace_label), exist_ok=True)
     with open(os.path.join(archiver_destination_arg, numberspace_label, "numberspace.txt"), "w") as f:
-        f.write(numberspace_label)
-    truenumbers = get_truenumbers(tn_rest_api_client, numberspace_label)
-    print(truenumbers)
+        f.write(full_numberspace_name)
+    print(f"Archiving truenumbers for numberspace: {numberspace_label}")
+    truenumbers = get_truenumbers(tn_rest_api_client, full_numberspace_name)
     with open(os.path.join(archiver_destination_arg, numberspace_label, "truenumbers.json"), "w") as f:
         json.dump(truenumbers, f, indent=4)
     statements = [truenumber["trueStatement"] for truenumber in truenumbers]
+    print(f"Archived {len(truenumbers)} truenumbers for numberspace: {numberspace_label}")
     with open(os.path.join(archiver_destination_arg, numberspace_label, "statements.txt"), "w") as f:
         f.write("\n".join(statements))
     if should_archive_queries:
-        queries = tn_rest_api_client.get_saved_queries(numberspace=numberspace_label)["queries"]
+        print(f"Archiving queries for numberspace: {numberspace_label}")
+        queries = tn_rest_api_client.get_saved_queries(numberspace=full_numberspace_name)["queries"]
+        print(f"Archived {len(queries)} queries for numberspace: {numberspace_label}")
         with open(os.path.join(archiver_destination_arg, numberspace_label, "queries.json"), "w") as f:
             json.dump(queries, f, indent=4)
     if should_archive_triggers:
-        triggers = trigger_api_client.get_triggers(numberspace=numberspace_label)["triggerDefinitions"]
+        print(f"Archiving triggers for numberspace: {numberspace_label}")
+        triggers = trigger_api_client.get_triggers(numberspace=full_numberspace_name, status=["ACTIVE", "INACTIVE"])["triggerDefinitions"]
+        print(f"Archived {len(triggers)} triggers for numberspace: {numberspace_label}")
         with open(os.path.join(archiver_destination_arg, numberspace_label, "triggers.json"), "w") as f:
             json.dump(triggers, f, indent=4)
     
@@ -106,13 +117,13 @@ def main():
 
     tn_rest_api_client = TruenumbersRestApi(base_url=tn_rest_api_domain, shared_headers={"Authorization": f"Bearer {api_token}"} if api_token is not None else None)
     trigger_api_client = TruenumbersTriggerApi(base_url=trigger_api_domain, shared_headers={"Authorization": f"Bearer {api_token}"} if api_token is not None else None)
-    numberspaces_to_archive = get_numberspaces_to_archive(tn_rest_api_client)
+    numberspace_labels_to_archive, numberspaces_to_archive = get_numberspaces_to_archive(tn_rest_api_client)
     if len(numberspaces_to_archive) == 0:
         print("No numberspaces to archive. Exiting...")
         return
-    print("Archiving numberspaces: ", numberspaces_to_archive)
+    print("Archiving numberspaces: ", numberspace_labels_to_archive)
 
-    for numberspace_label in numberspaces_to_archive:
-        archive_numberspace(tn_rest_api_client, trigger_api_client, numberspace_label, should_archive_queries, should_archive_triggers)
+    for numberspace_label in numberspace_labels_to_archive:
+        archive_numberspace(tn_rest_api_client, trigger_api_client, numberspace_label, numberspaces_to_archive[numberspace_labels_to_archive.index(numberspace_label)], should_archive_queries, should_archive_triggers)
 
 main()
