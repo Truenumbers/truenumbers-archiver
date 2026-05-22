@@ -140,9 +140,15 @@ def load_numberspace(tn_rest_api_client: TruenumbersRestApi, trigger_api_client:
             print(f"Loading statements for numberspace: {numberspace_label}")
             tn_rest_api_client.create_truenumbers_from_statement(numberspace=numberspace, true_statement=statements)
         if from_truenumbers and has_truenumbers:
-            ## TODO: chunk the truenumbers into smaller batches and create them in chunks
-            print(f"Loading truenumbers for numberspace: {numberspace_label}")
-            tn_rest_api_client.create_truenumbers_from_json(numberspace=numberspace, truenumbers_json=truenumbers)
+            batch_size = 500
+            total = len(truenumbers)
+            print(f"Loading {total} truenumbers for numberspace: {numberspace_label}")
+            for start in range(0, total, batch_size):
+                batch = truenumbers[start:start + batch_size]
+                batch_num = start // batch_size + 1
+                batch_count = (total + batch_size - 1) // batch_size
+                print(f"  Posting batch {batch_num}/{batch_count} ({len(batch)} truenumbers)")
+                tn_rest_api_client.create_truenumbers_from_json(numberspace=numberspace, truenumbers_json=batch)
     except Exception as e:
         print(f"Error loading numberspace: {numberspace_label}")
         print(e)
