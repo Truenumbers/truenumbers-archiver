@@ -20,6 +20,10 @@ def _venv_python(root: Path) -> Path | None:
 
 
 def ensure_project_venv() -> None:
+    # PyInstaller and other bundlers set sys.frozen; deps are already packaged.
+    if getattr(sys, "frozen", False):
+        return
+
     if os.environ.get(_REEXEC_FLAG):
         return
 
