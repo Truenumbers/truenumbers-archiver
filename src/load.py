@@ -67,11 +67,11 @@ def get_numberspaces_to_load():
         return [numberspace for numberspace in numberspace_archives if format_numberspace_srd_label(numberspace) in numberspaces_to_load]
 
 def delete_triggers(trigger_api_client: TruenumbersTriggerApi, numberspace: str):
-    triggers = trigger_api_client.get_triggers(numberspace=numberspace)
+    triggers = trigger_api_client.get_triggers(numberspace=numberspace, status=["ACTIVE", "INACTIVE"])["triggerDefinitions"]
     if len(triggers) > 0:
         for trigger in triggers:
-            print(f"Deleting trigger: {trigger['name']} for numberspace: {numberspace}")
-            trigger_api_client.delete_trigger(numberspace=numberspace, id=trigger["id"])
+            print(f"\t Deleting trigger: {trigger['name']} for numberspace: {numberspace}")
+            trigger_api_client.delete_trigger(id=trigger["id"])
 
 def load_triggers(trigger_api_client: TruenumbersTriggerApi, numberspace: str, delete_existing_data: bool):
     numberspace_label = format_numberspace_srd_label(numberspace)
@@ -85,6 +85,7 @@ def load_triggers(trigger_api_client: TruenumbersTriggerApi, numberspace: str, d
                 print(f"Deleting existing triggers for numberspace: {numberspace_label}")
                 delete_triggers(trigger_api_client, numberspace)
                 # trigger_api_client.delete_triggers(numberspace=numberspace)
+                print("\n")
             for trigger in triggers:
                 print(f"Loading trigger: {trigger['name']} for numberspace: {numberspace_label}")
                 trigger_api_client.create_trigger(numberspace=numberspace, name=trigger["name"], tnql=trigger["tnql"],
@@ -96,10 +97,10 @@ def load_triggers(trigger_api_client: TruenumbersTriggerApi, numberspace: str, d
         return
 
 def delete_queries(tn_rest_api_client: TruenumbersRestApi, numberspace: str):
-    queries = tn_rest_api_client.get_saved_queries(numberspace=numberspace)
+    queries = tn_rest_api_client.get_saved_queries(numberspace=numberspace)["queries"]
     if len(queries) > 0:
         for query in queries:
-            print(f"Deleting query: {query['name']} for numberspace: {numberspace}")
+            print(f"\t Deleting query: {query['name']} for numberspace: {numberspace}")
             tn_rest_api_client.delete_saved_query(numberspace=numberspace, id=query["id"])
 
 def load_queries(tn_rest_api_client: TruenumbersRestApi, numberspace: str, delete_existing_data: bool):
@@ -114,6 +115,7 @@ def load_queries(tn_rest_api_client: TruenumbersRestApi, numberspace: str, delet
                 print(f"Deleting existing queries for numberspace: {numberspace_label}")
                 delete_queries(tn_rest_api_client, numberspace)
                 # tn_rest_api_client.delete_saved_queries(numberspace=numberspace)
+                print("\n")
             for query in queries:
                 print(f"Loading query: {query['name']} for numberspace: {numberspace_label}")
                 tn_rest_api_client.create_saved_query(numberspace=numberspace, name=query["name"], tnql=query["tnql"])
