@@ -5,8 +5,8 @@ import os
 import json
 from InquirerPy import inquirer
 from InquirerPy.separator import Separator
-from helpers import format_numberspace_srd_label, get_api_domains, get_api_error_code, get_api_token, get_dir_name_for_numberspace
-from truenumbers_python_lib import TruenumbersRestApi, TruenumbersTriggerApi
+from helpers import format_numberspace_srd_label, get_api_domains, get_api_error_code, get_api_token, get_artifact_name_id_and_extension_from_file_name, get_dir_name_for_numberspace
+from truenumbers_python_lib import TruenumbersArtifactApi, TruenumbersRestApi, TruenumbersTriggerApi
 
 API_TOKEN_ENV_VAR = 'API_TOKEN'
 
@@ -16,12 +16,14 @@ parser.add_argument('--numberspaces', type=str, help='List of comma separated nu
 parser.add_argument('--load_all_numberspaces', dest='load_all_numberspaces', action="store_true", help='Controls whether to load all numberspaces or not')
 parser.add_argument('--load_queries', dest='load_queries', action="store_true", help='Controls whether to load queries or not')
 parser.add_argument('--load_triggers', dest='load_triggers', action="store_true", help='Controls whether to load triggers or not')
+parser.add_argument('--load_artifacts', dest='load_artifacts', action="store_true", help='Controls whether to load artifacts or not')
 parser.add_argument('-a','--auth', dest='has_auth', action="store_true", help='Controls whether API requires authentication or not', default=False, required=False)
 parser.add_argument('-e', '--email', type=str, help='Optional email to authenticate with the API', default=None, required=False)
 parser.add_argument('-p', '--password', type=str, help='Optional password to authenticate with the API', default=None, required=False)
 parser.add_argument('-o', '--organization', type=str, help='Optional organization to authenticate with the API', default=None, required=False)
 parser.add_argument('--tn_rest_api', dest='tn_rest_api_domain', type=str, help='Optional domain to authenticate with the REST API', default=None, required=False)
 parser.add_argument('--trigger_api', dest='trigger_api_domain', type=str, help='Optional domain to authenticate with the Trigger API', default=None, required=False)
+parser.add_argument('--artifact_api', dest='artifact_api_domain', type=str, help='Optional domain to authenticate with the Artifact API', default=None, required=False)
 parser.add_argument('-d', '--loader_destination', type=str, help='Optional destination to archive the numberspaces to', default="../archived_numberspaces", required=False)
 parser.add_argument('--delete_existing_data', dest='delete_existing_data', action="store_true", help='Controls whether to delete existing data before loading', default=False, required=False)
 parser.add_argument('--load_from', type=str, help='Optional source of the data to load', choices=["Statements", "Truenumbers"], default=None, required=False)
@@ -37,9 +39,12 @@ password_arg = parser.parse_args().password;
 organization_arg = parser.parse_args().organization;
 tn_rest_api_domain_arg = parser.parse_args().tn_rest_api_domain;
 trigger_api_domain_arg = parser.parse_args().trigger_api_domain;
+artifact_api_domain_arg = parser.parse_args().artifact_api_domain;
 loader_destination_arg = parser.parse_args().loader_destination;
 delete_existing_data_arg = parser.parse_args().delete_existing_data;
 load_from_arg = parser.parse_args().load_from;
+load_artifacts_arg = parser.parse_args().load_artifacts;
+
 
 def get_numberspaces_to_load():
     numberspace_archives = []
@@ -124,8 +129,31 @@ def load_queries(tn_rest_api_client: TruenumbersRestApi, numberspace: str, delet
         print(e)
         return
 
+def load_artifacts(artifact_api_client: TruenumbersArtifactApi, numberspace: str, delete_existing_data: bool):
+    numberspace_label = format_numberspace_srd_label(numberspace)
+    numberspace_dir_name = get_dir_name_for_numberspace(numberspace_label)
+    try:
+        print(f"Loading artifacts for numberspace: {numberspace_label}")
+        for file in os.listdir(os.path.join(loader_destination_arg, numberspace_dir_name, "files")):
+            with open(os.path.join(loader_destination_arg, numberspace_dir_name, "files", file), "rb") as f:
+                orig_file_name, artifact_id, extension = get_artifact_name_id_and_extension_from_file_name(file)
+                file_name = f"{orig_file_name}.{extension}"
+                if delete_existing_data:
+                    try:
+                        print(f"Deleted existing artifact: {file_name} for numberspace: {numberspace_label}")
+                        artifact_api_client.delete_artifact_by_id(id=artifact_id)
+                    except Exception as e:
+                        print(f"Error deleting existing artifact: {file_name} for numberspace: {numberspace_label}")
+                        print(e)
+                        continue
+                print(f"Loading artifact: {file_name} for numberspace: {numberspace_label}")
+                artifact_api_client.create_artifact(file_path=os.path.join(loader_destination_arg, numberspace_dir_name, "files", file), artifact_id=artifact_id, file_name_override=file_name)
+    except Exception as e:
+        print(f"Error loading artifacts for numberspace: {numberspace_label}")
+        print(e)
+        return
 
-def load_numberspace(tn_rest_api_client: TruenumbersRestApi, trigger_api_client: TruenumbersTriggerApi, numberspace: str, should_load_queries: bool, should_load_triggers: bool, delete_existing_data: bool, load_from: str):
+def load_numberspace(tn_rest_api_client: TruenumbersRestApi, trigger_api_client: TruenumbersTriggerApi, artifact_api_client: TruenumbersArtifactApi, numberspace: str, should_load_queries: bool, should_load_triggers: bool, should_load_artifacts: bool, delete_existing_data: bool, load_from: str):
     numberspace_label = format_numberspace_srd_label(numberspace)
     numberspace_dir_name = get_dir_name_for_numberspace(numberspace_label)
     print("\n\n")
@@ -178,13 +206,17 @@ def load_numberspace(tn_rest_api_client: TruenumbersRestApi, trigger_api_client:
         load_queries(tn_rest_api_client, numberspace, delete_existing_data)
     if should_load_triggers:
         load_triggers(trigger_api_client, numberspace, delete_existing_data)
+    if should_load_artifacts:
+        load_artifacts(artifact_api_client, numberspace, delete_existing_data)
 
 def main():
     should_load_triggers = load_triggers_arg or inquirer.confirm(message="Do you want to load triggers?", default=True).execute()
     should_load_queries = load_queries_arg or inquirer.confirm(message="Do you want to load queries?", default=True).execute()
-    tn_rest_api_domain, trigger_api_domain = get_api_domains(should_load_triggers, arguments_dict={
+    should_load_artifacts = load_artifacts_arg or inquirer.confirm(message="Do you want to load artifacts?", default=True).execute()
+    tn_rest_api_domain, trigger_api_domain, artifact_api_domain = get_api_domains(should_load_triggers, should_load_artifacts, arguments_dict={
         "tn_rest_api_domain": tn_rest_api_domain_arg,
-        "trigger_api_domain": trigger_api_domain_arg
+        "trigger_api_domain": trigger_api_domain_arg,
+        "artifact_api_domain": artifact_api_domain_arg
     })
     api_token = get_api_token(tn_rest_api_domain, arguments_dict={
         "email": email_arg,
@@ -195,12 +227,12 @@ def main():
     })
     tn_rest_api_client = TruenumbersRestApi(base_url=tn_rest_api_domain, shared_headers={"Authorization": f"Bearer {api_token}"} if api_token is not None else None)
     trigger_api_client = TruenumbersTriggerApi(base_url=trigger_api_domain, shared_headers={"Authorization": f"Bearer {api_token}"} if api_token is not None else None)
-
+    artifact_api_client = TruenumbersArtifactApi(base_url=artifact_api_domain, shared_headers={"Authorization": f"Bearer {api_token}"} if api_token is not None else None)
     delete_existing_data = delete_existing_data_arg or inquirer.confirm(message="Do you want to delete existing data before loading?", default=False).execute()
     numberspaces_to_load = get_numberspaces_to_load()
     print(f"Numberspaces to load: {[format_numberspace_srd_label(numberspace) for numberspace in numberspaces_to_load]}")
     load_from = load_from_arg or inquirer.select(message="Select the source of the data to load", choices=["Statements", "Truenumbers"], default="Truenumbers").execute()
     for numberspace in numberspaces_to_load:
-        load_numberspace(tn_rest_api_client, trigger_api_client, numberspace, should_load_queries, should_load_triggers, delete_existing_data, load_from)
+        load_numberspace(tn_rest_api_client, trigger_api_client, artifact_api_client, numberspace, should_load_queries, should_load_triggers, should_load_artifacts, delete_existing_data, load_from)
 
 main()

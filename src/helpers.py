@@ -7,20 +7,27 @@ import re
 def get_tn_login_api_client(tn_rest_api_domain):
     return TruenumbersRestApi(base_url=tn_rest_api_domain)
 
-def get_api_domains(should_do_triggers_api, arguments_dict):
+def get_api_domains(should_do_triggers_api, should_do_artifacts_api, arguments_dict):
     tn_rest_api_domain_arg = arguments_dict.get("tn_rest_api_domain", None)
     trigger_api_domain_arg = arguments_dict.get("trigger_api_domain", None)
+    artifact_api_domain_arg = arguments_dict.get("artifact_api_domain", None)
     if tn_rest_api_domain_arg and tn_rest_api_domain_arg != "":
         tn_rest_api_domain = tn_rest_api_domain_arg
     else:
         tn_rest_api_domain = inquirer.text(message="Enter the domain of the Truenumbers REST API").execute()
     if not should_do_triggers_api:
-        return tn_rest_api_domain, ""
+        return tn_rest_api_domain, "", ""
     if trigger_api_domain_arg and trigger_api_domain_arg != "":
         trigger_api_domain = trigger_api_domain_arg
     else:
         trigger_api_domain = inquirer.text(message="Enter the domain of the Tigger API").execute()
-    return tn_rest_api_domain, trigger_api_domain
+    if not should_do_artifacts_api:
+        return tn_rest_api_domain, trigger_api_domain, ""
+    if artifact_api_domain_arg and artifact_api_domain_arg != "":
+        artifact_api_domain = artifact_api_domain_arg
+    else:
+        artifact_api_domain = inquirer.text(message="Enter the domain of the Artifact API").execute()
+    return tn_rest_api_domain, trigger_api_domain, artifact_api_domain
 
 def get_api_token(tn_rest_api_domain, arguments_dict):
     email_arg = arguments_dict.get("email", None)
@@ -103,3 +110,19 @@ def format_numberspace_srd_label(srd: str) -> str:
 
 def get_dir_name_for_numberspace(numberspace: str) -> str:
     return format_numberspace_srd_label(numberspace).replace("/", "_").replace(":", "_")
+
+def get_file_name_from_artifact_value(artifact_value: str) -> str:
+    name_id_and_extension =artifact_value.split('_system:artifact:')[1]
+    id, name_extension = name_id_and_extension.split(':')
+    reversed_name_extension = name_extension[::-1]
+    reversed_extension, reversed_name = reversed_name_extension.split('_', 1)
+    name = reversed_name[::-1]
+    extension = reversed_extension[::-1]
+    return f"{id}___{name}.{extension}"
+
+
+def get_artifact_name_id_and_extension_from_file_name(file_name: str) -> tuple[str, str, str]:
+    artifact_id, name_with_extension = file_name.split('___', 1)
+    name, extension = name_with_extension.rsplit('.', 1)
+    return name, artifact_id, extension
+
