@@ -1,4 +1,5 @@
 #! /usr/bin/env python3
+# import shutil
 import _venv_bootstrap  # noqa: F401, E402 — must run before other imports
 import json
 from InquirerPy import inquirer
@@ -148,6 +149,12 @@ def main():
         print("No numberspaces to archive. Exiting...")
         return
     print("Archiving numberspaces: ", numberspace_labels_to_archive)
+
+    # # TODO if the archive destination directory already exists and it contains files, ask to delete it
+    # if os.path.exists(archiver_destination_arg) and os.listdir(archiver_destination_arg):
+    #     if inquirer.confirm(message="The archive destination directory already exists and it contains files. Do you want to delete it?", default=False).execute():
+    #         shutil.rmtree(archiver_destination_arg, ignore_errors=True)
+    #         os.makedirs(archiver_destination_arg)
 
     for numberspace_label in numberspace_labels_to_archive:
         archive_numberspace(tn_rest_api_client, trigger_api_client, artifact_api_client, numberspace_label, numberspaces_to_archive[numberspace_labels_to_archive.index(numberspace_label)], should_archive_queries, should_archive_triggers)
