@@ -19,12 +19,7 @@ fi
 "$PYTHON" -m pip install -r requirements.txt -r requirements-build.txt
 "$PYTHON" -m PyInstaller --noconfirm --clean truenumbers-archiver.spec
 
-cp dist/tn-load.exe dist/tn-load.sh
-cp dist/tn-archive.exe dist/tn-archive.sh
-
 echo ""
 echo "Built:"
 echo "  dist/tn-load$( [[ "$OSTYPE" == *msys* || "$OSTYPE" == *win32* ]] && echo .exe )"
 echo "  dist/tn-archive$( [[ "$OSTYPE" == *msys* || "$OSTYPE" == *win32* ]] && echo .exe )"
-echo "  dist/tn-load.sh"
-echo "  dist/tn-archive.sh"
