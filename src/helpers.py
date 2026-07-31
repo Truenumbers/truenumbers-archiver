@@ -16,14 +16,16 @@ def get_api_domains(should_do_triggers_api, should_do_artifacts_api, arguments_d
         tn_rest_api_domain = tn_rest_api_domain_arg
     else:
         tn_rest_api_domain = inquirer.text(message="Enter the domain of the Truenumbers REST API").execute()
-    if not should_do_triggers_api:
-        return tn_rest_api_domain, "no-trigger-api", "no-artifact-api"
+    if not should_do_triggers_api and not should_do_artifacts_api:
+        return tn_rest_api_domain, None, None
     if trigger_api_domain_arg and trigger_api_domain_arg != "":
         trigger_api_domain = trigger_api_domain_arg
-    else:
+    elif should_do_triggers_api:
         trigger_api_domain = inquirer.text(message="Enter the domain of the Trigger API").execute()
+    else:
+        trigger_api_domain = None
     if not should_do_artifacts_api:
-        return tn_rest_api_domain, trigger_api_domain, "no-artifact-api"
+        return tn_rest_api_domain, trigger_api_domain, None
     if artifact_api_domain_arg and artifact_api_domain_arg != "":
         artifact_api_domain = artifact_api_domain_arg
     else:

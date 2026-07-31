@@ -142,8 +142,8 @@ def main():
     })
 
     tn_rest_api_client = TruenumbersRestApi(base_url=tn_rest_api_domain, shared_headers={"Authorization": f"Bearer {api_token}"} if api_token is not None else None)
-    trigger_api_client = TruenumbersTriggerApi(base_url=trigger_api_domain, shared_headers={"Authorization": f"Bearer {api_token}"} if api_token is not None else None)
-    artifact_api_client = TruenumbersArtifactApi(base_url=artifact_api_domain, shared_headers={"Authorization": f"Bearer {api_token}"} if api_token is not None else None)
+    trigger_api_client = None if not should_archive_triggers else TruenumbersTriggerApi(base_url=trigger_api_domain, shared_headers={"Authorization": f"Bearer {api_token}"} if api_token is not None else None)
+    artifact_api_client = None if not should_archive_artifacts else TruenumbersArtifactApi(base_url=artifact_api_domain, shared_headers={"Authorization": f"Bearer {api_token}"} if api_token is not None else None)
     numberspace_labels_to_archive, numberspaces_to_archive = get_numberspaces_to_archive(tn_rest_api_client)
     if len(numberspaces_to_archive) == 0:
         print("No numberspaces to archive. Exiting...")

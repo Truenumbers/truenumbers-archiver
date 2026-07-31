@@ -226,8 +226,8 @@ def main():
         "has_auth": has_auth_arg
     })
     tn_rest_api_client = TruenumbersRestApi(base_url=tn_rest_api_domain, shared_headers={"Authorization": f"Bearer {api_token}"} if api_token is not None else None)
-    trigger_api_client = TruenumbersTriggerApi(base_url=trigger_api_domain, shared_headers={"Authorization": f"Bearer {api_token}"} if api_token is not None else None)
-    artifact_api_client = TruenumbersArtifactApi(base_url=artifact_api_domain, shared_headers={"Authorization": f"Bearer {api_token}"} if api_token is not None else None)
+    trigger_api_client = None if not should_load_triggers else TruenumbersTriggerApi(base_url=trigger_api_domain, shared_headers={"Authorization": f"Bearer {api_token}"} if api_token is not None else None)
+    artifact_api_client = None if not should_load_artifacts else TruenumbersArtifactApi(base_url=artifact_api_domain, shared_headers={"Authorization": f"Bearer {api_token}"} if api_token is not None else None)
     delete_existing_data = delete_existing_data_arg or inquirer.confirm(message="Do you want to delete existing data before loading?", default=False).execute()
     numberspaces_to_load = get_numberspaces_to_load()
     print(f"Numberspaces to load: {[format_numberspace_srd_label(numberspace) for numberspace in numberspaces_to_load]}")
