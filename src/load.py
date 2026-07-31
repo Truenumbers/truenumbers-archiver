@@ -153,7 +153,7 @@ def load_artifacts(artifact_api_client: TruenumbersArtifactApi, numberspace: str
         print(e)
         return
 
-def load_numberspace(tn_rest_api_client: TruenumbersRestApi, trigger_api_client: TruenumbersTriggerApi, artifact_api_client: TruenumbersArtifactApi, numberspace: str, should_load_queries: bool, should_load_triggers: bool, should_load_artifacts: bool, delete_existing_data: bool, load_from: str):
+def load_numberspace(tn_rest_api_client: TruenumbersRestApi, trigger_api_client: TruenumbersTriggerApi, artifact_api_client: TruenumbersArtifactApi, numberspace: str, should_load_queries: bool, delete_existing_data: bool, load_from: str):
     numberspace_label = format_numberspace_srd_label(numberspace)
     numberspace_dir_name = get_dir_name_for_numberspace(numberspace_label)
     print("\n\n")
@@ -204,9 +204,9 @@ def load_numberspace(tn_rest_api_client: TruenumbersRestApi, trigger_api_client:
 
     if should_load_queries:
         load_queries(tn_rest_api_client, numberspace, delete_existing_data)
-    if should_load_triggers:
+    if trigger_api_client is not None:
         load_triggers(trigger_api_client, numberspace, delete_existing_data)
-    if should_load_artifacts:
+    if artifact_api_client is not None:
         load_artifacts(artifact_api_client, numberspace, delete_existing_data)
 
 def main():
@@ -233,6 +233,6 @@ def main():
     print(f"Numberspaces to load: {[format_numberspace_srd_label(numberspace) for numberspace in numberspaces_to_load]}")
     load_from = load_from_arg or inquirer.select(message="Select the source of the data to load", choices=["Statements", "Truenumbers"], default="Truenumbers").execute()
     for numberspace in numberspaces_to_load:
-        load_numberspace(tn_rest_api_client, trigger_api_client, artifact_api_client, numberspace, should_load_queries, should_load_triggers, should_load_artifacts, delete_existing_data, load_from)
+        load_numberspace(tn_rest_api_client, trigger_api_client, artifact_api_client, numberspace, should_load_queries, delete_existing_data, load_from)
 
 main()

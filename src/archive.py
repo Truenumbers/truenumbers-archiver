@@ -77,7 +77,7 @@ def get_truenumbers(tn_rest_api_client: TruenumbersRestApi, numberspace: str) ->
         truenumbers.extend(response["truenumbers"])
     return truenumbers
 
-def archive_numberspace(tn_rest_api_client: TruenumbersRestApi, trigger_api_client: TruenumbersTriggerApi, artifact_api_client: TruenumbersArtifactApi, numberspace_label: str, full_numberspace_name: str, should_archive_queries: bool, should_archive_triggers: bool):
+def archive_numberspace(tn_rest_api_client: TruenumbersRestApi, trigger_api_client: TruenumbersTriggerApi, artifact_api_client: TruenumbersArtifactApi, numberspace_label: str, full_numberspace_name: str, should_archive_queries: bool):
     print("\n\n")
     print(f"Archiving numberspace: {numberspace_label}")
 
@@ -99,7 +99,7 @@ def archive_numberspace(tn_rest_api_client: TruenumbersRestApi, trigger_api_clie
     print(f"Archived {len(truenumbers)} truenumbers for numberspace: {numberspace_label}")
     with open(os.path.join(archiver_destination_arg, numberspace_dir_name, "statements.txt"), "w") as f:
         f.write("\n".join(statements))
-    if archive_artifacts_arg and len(artifact_ids) > 0:
+    if artifact_api_client is not None and len(artifact_ids) > 0:
         print(f"Archiving artifacts for numberspace: {numberspace_label}")
         os.makedirs(os.path.join(archiver_destination_arg, numberspace_dir_name, "files"), exist_ok=True)
         for artifact_id in artifact_ids:
@@ -116,7 +116,7 @@ def archive_numberspace(tn_rest_api_client: TruenumbersRestApi, trigger_api_clie
         with open(os.path.join(archiver_destination_arg, numberspace_dir_name, "queries.json"), "w") as f:
             json.dump(queries, f, indent=4)
             
-    if should_archive_triggers:
+    if trigger_api_client is not None:
         print(f"Archiving triggers for numberspace: {numberspace_label}")
         triggers = trigger_api_client.get_triggers(numberspace=full_numberspace_name, status=["ACTIVE", "INACTIVE"])["triggerDefinitions"]
         print(f"Archived {len(triggers)} triggers for numberspace: {numberspace_label}")
@@ -157,6 +157,6 @@ def main():
     #         os.makedirs(archiver_destination_arg)
 
     for numberspace_label in numberspace_labels_to_archive:
-        archive_numberspace(tn_rest_api_client, trigger_api_client, artifact_api_client, numberspace_label, numberspaces_to_archive[numberspace_labels_to_archive.index(numberspace_label)], should_archive_queries, should_archive_triggers)
+        archive_numberspace(tn_rest_api_client, trigger_api_client, artifact_api_client, numberspace_label, numberspaces_to_archive[numberspace_labels_to_archive.index(numberspace_label)], should_archive_queries)
 
 main()
