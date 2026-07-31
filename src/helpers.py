@@ -5,6 +5,7 @@ import re
 
 
 def get_tn_login_api_client(tn_rest_api_domain):
+    print(f"Getting Truenumbers Login API client for domain: {tn_rest_api_domain}")
     return TruenumbersRestApi(base_url=tn_rest_api_domain)
 
 def get_api_domains(should_do_triggers_api, should_do_artifacts_api, arguments_dict):
@@ -16,13 +17,13 @@ def get_api_domains(should_do_triggers_api, should_do_artifacts_api, arguments_d
     else:
         tn_rest_api_domain = inquirer.text(message="Enter the domain of the Truenumbers REST API").execute()
     if not should_do_triggers_api:
-        return tn_rest_api_domain, "", ""
+        return tn_rest_api_domain, "no-trigger-api", "no-artifact-api"
     if trigger_api_domain_arg and trigger_api_domain_arg != "":
         trigger_api_domain = trigger_api_domain_arg
     else:
-        trigger_api_domain = inquirer.text(message="Enter the domain of the Tigger API").execute()
+        trigger_api_domain = inquirer.text(message="Enter the domain of the Trigger API").execute()
     if not should_do_artifacts_api:
-        return tn_rest_api_domain, trigger_api_domain, ""
+        return tn_rest_api_domain, trigger_api_domain, "no-artifact-api"
     if artifact_api_domain_arg and artifact_api_domain_arg != "":
         artifact_api_domain = artifact_api_domain_arg
     else:
