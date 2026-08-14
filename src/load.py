@@ -27,6 +27,8 @@ parser.add_argument('--artifact_api', dest='artifact_api_domain', type=str, help
 parser.add_argument('-d', '--loader_destination', type=str, help='Optional destination to archive the numberspaces to', default="../archived_numberspaces", required=False)
 parser.add_argument('--delete_existing_data', dest='delete_existing_data', action="store_true", help='Controls whether to delete existing data before loading', default=False, required=False)
 parser.add_argument('--load_from', type=str, help='Optional source of the data to load', choices=["Statements", "Truenumbers"], default=None, required=False)
+parser.add_argument('--upsert', dest='upsert_truenumbers', action="store_true", help='Controls whether to upsert truenumbers or not', default=False, required=False)
+parser.add_argument('--skip_upsert_options', dest='skip_upsert_options', action="store_true", help='Controls whether to skip the upsert options', default=False, required=False)
 
 api_token_arg = parser.parse_args().api_token;
 numberspaces_arg = parser.parse_args().numberspaces;
@@ -44,7 +46,8 @@ loader_destination_arg = parser.parse_args().loader_destination;
 delete_existing_data_arg = parser.parse_args().delete_existing_data;
 load_from_arg = parser.parse_args().load_from;
 load_artifacts_arg = parser.parse_args().load_artifacts;
-
+upsert_truenumbers_arg = parser.parse_args().upsert_truenumbers;
+skip_upsert_options_arg = parser.parse_args().skip_upsert_options;
 
 def get_numberspaces_to_load():
     numberspace_archives = []
@@ -153,15 +156,8 @@ def load_artifacts(artifact_api_client: TruenumbersArtifactApi, numberspace: str
         print(e)
         return
 
-def load_numberspace(tn_rest_api_client: TruenumbersRestApi, trigger_api_client: TruenumbersTriggerApi, artifact_api_client: TruenumbersArtifactApi, numberspace: str, should_load_queries: bool, delete_existing_data: bool, load_from: str):
+def create_numberspace(tn_rest_api_client: TruenumbersRestApi, numberspace: str):
     numberspace_label = format_numberspace_srd_label(numberspace)
-    numberspace_dir_name = get_dir_name_for_numberspace(numberspace_label)
-    print("\n\n")
-    print(f"Loading numberspace: {numberspace_label}")
-    from_statements = load_from == "Statements"
-    from_truenumbers = load_from == "Truenumbers"
-    statements = ''
-    truenumbers = []
     try:
         tn_rest_api_client.create_numberspace(numberspace=numberspace)
     except Exception as e:
@@ -170,7 +166,28 @@ def load_numberspace(tn_rest_api_client: TruenumbersRestApi, trigger_api_client:
         else:
             print(f"Error creating numberspace: {numberspace_label}")
             print(e)
-            return
+
+def load_numberspace(tn_rest_api_client: TruenumbersRestApi, trigger_api_client: TruenumbersTriggerApi, artifact_api_client: TruenumbersArtifactApi, numberspace: str, should_load_queries: bool, delete_existing_data: bool, load_from: str, upsert_truenumbers: bool):
+    numberspace_label = format_numberspace_srd_label(numberspace)
+    numberspace_dir_name = get_dir_name_for_numberspace(numberspace_label)
+    print("\n\n")
+    print(f"Loading numberspace: {numberspace_label}")
+    from_statements = load_from == "Statements"
+    from_truenumbers = load_from == "Truenumbers"
+    statements = ''
+    truenumbers = []
+    should_override_numberspace = False
+    should_regenerate_ids = False
+    if upsert_truenumbers and not skip_upsert_options_arg:
+        should_override_numberspace = inquirer.confirm(message=f"Do you want to override the numberspace the upserted truenumbers will be written to? Currently {numberspace_label}", default=False).execute()
+        if should_override_numberspace:
+            numberspace = inquirer.text(message=f"Enter the new numberspace name").execute()
+            numberspace_label = format_numberspace_srd_label(numberspace)
+            should_regenerate_ids = True
+        if not should_regenerate_ids:
+            should_regenerate_ids = inquirer.confirm(message=f"Do you want to override the IDs of the truenumbers?", default=False).execute()
+
+    create_numberspace(tn_rest_api_client, numberspace)
     with open(os.path.join(loader_destination_arg, numberspace_dir_name, "statements.txt"), "r") as f:
         statements = f.read()
     with open(os.path.join(loader_destination_arg, numberspace_dir_name, "truenumbers.json"), "r") as f:
@@ -196,7 +213,14 @@ def load_numberspace(tn_rest_api_client: TruenumbersRestApi, trigger_api_client:
                 batch_num = start // batch_size + 1
                 batch_count = (total + batch_size - 1) // batch_size
                 print(f"  Posting batch {batch_num}/{batch_count} ({len(batch)} truenumbers)")
-                tn_rest_api_client.create_truenumbers_from_json(numberspace=numberspace, truenumbers_json=batch)
+                if upsert_truenumbers:
+                    tn_rest_api_client.upsert_truenumbers(
+                        truenumbers_json=batch,
+                        numberspace_override=numberspace if should_regenerate_ids else None,
+                        regenerate_id=should_regenerate_ids,
+                    )
+                else:
+                    tn_rest_api_client.create_truenumbers_from_json(numberspace=numberspace, truenumbers_json=batch)
     except Exception as e:
         print(f"Error loading numberspace: {numberspace_label}")
         print(e)
@@ -210,6 +234,12 @@ def load_numberspace(tn_rest_api_client: TruenumbersRestApi, trigger_api_client:
         load_artifacts(artifact_api_client, numberspace, delete_existing_data)
 
 def main():
+    upsert_truenumbers = upsert_truenumbers_arg or inquirer.confirm(message="Do you want to upsert truenumbers?", default=False).execute()
+    load_from = None
+    if upsert_truenumbers:
+        load_from = "Truenumbers"
+    else:
+        load_from = load_from_arg or inquirer.select(message="Select the source of the data to load", choices=["Statements", "Truenumbers"], default="Truenumbers").execute()
     should_load_triggers = load_triggers_arg or inquirer.confirm(message="Do you want to load triggers?", default=True).execute()
     should_load_queries = load_queries_arg or inquirer.confirm(message="Do you want to load queries?", default=True).execute()
     should_load_artifacts = load_artifacts_arg or inquirer.confirm(message="Do you want to load artifacts?", default=True).execute()
@@ -231,8 +261,7 @@ def main():
     delete_existing_data = delete_existing_data_arg or inquirer.confirm(message="Do you want to delete existing data before loading?", default=False).execute()
     numberspaces_to_load = get_numberspaces_to_load()
     print(f"Numberspaces to load: {[format_numberspace_srd_label(numberspace) for numberspace in numberspaces_to_load]}")
-    load_from = load_from_arg or inquirer.select(message="Select the source of the data to load", choices=["Statements", "Truenumbers"], default="Truenumbers").execute()
     for numberspace in numberspaces_to_load:
-        load_numberspace(tn_rest_api_client, trigger_api_client, artifact_api_client, numberspace, should_load_queries, delete_existing_data, load_from)
+        load_numberspace(tn_rest_api_client, trigger_api_client, artifact_api_client, numberspace, should_load_queries, delete_existing_data, load_from, upsert_truenumbers)
 
 main()
